@@ -38,7 +38,7 @@ class Method
         end
         raise
       ensure
-        current_span&.finish
+        current_span.finish if current_span
       end
 
       def trace_method(klazz, method_name, **args, &block)
