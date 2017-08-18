@@ -23,6 +23,13 @@ RSpec.describe Method::Tracer do
       expect(tracer.finished_spans.last.tags).to eq(tags)
     end
 
+    it "allows to specify custom per-method-call tracer" do
+      local_tracer = Test::Tracer.new
+      Method::Tracer.trace("test span", tracer: local_tracer) { true }
+      expect(tracer.finished_spans).to be_empty
+      expect(local_tracer.finished_spans.last.operation_name).to eq("test span")
+    end
+
     context "exception is thrown within yielded block" do
       let(:error) { StandardError.new }
 
@@ -58,6 +65,13 @@ RSpec.describe Method::Tracer do
       it "allows to override active span" do
         new_root = tracer.start_span("new root")
         Method::Tracer.trace("test span", child_of: new_root) { true }
+
+        expect(tracer.finished_spans.last.context.parent_span_id).to eq(new_root.context.span_id)
+      end
+
+      it "allows to override active span with proc" do
+        new_root = tracer.start_span("new root")
+        Method::Tracer.trace("test span", child_of: -> { new_root }) { true }
 
         expect(tracer.finished_spans.last.context.parent_span_id).to eq(new_root.context.span_id)
       end
