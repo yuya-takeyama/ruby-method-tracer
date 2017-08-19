@@ -13,12 +13,12 @@ class Method
         klazz.extend(ClassMethods)
       end
 
-      def tracer
+      def method_tracer
         @tracer || (raise ConfigError.new("Please configure the tracer using Method::Tracer.configure method"))
       end
 
       def active_span
-        @active_span.respond_to?(:call) ? @active_span.call : @active_span
+        @active_span
       end
 
       def configure(tracer: OpenTracing.global_tracer, active_span: nil)
@@ -26,8 +26,10 @@ class Method
         @active_span = active_span
       end
 
-      def trace(operation_name, **args,  &block)
-        args[:child_of] = active_span unless args.include?(:child_of)
+      def trace(operation_name, tracer: method_tracer, **args,  &block)
+        parent_span = args.include?(:child_of) ? args[:child_of] : active_span
+        args[:child_of] = parent_span.respond_to?(:call) ? parent_span.call : parent_span
+
         current_span = tracer.start_span(operation_name, **args)
 
         yield current_span
