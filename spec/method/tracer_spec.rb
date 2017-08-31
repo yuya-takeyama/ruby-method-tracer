@@ -13,21 +13,22 @@ RSpec.describe Method::Tracer do
     it "creates a new span" do
       Method::Tracer.trace("test span") { true }
 
-      expect(tracer.finished_spans.last.operation_name).to eq("test span")
+      expect(tracer).to have_span("test span")
     end
 
     it "allows to pass tags" do
       tags = {'span.kind' => 'test'}
       Method::Tracer.trace("test span", tags: tags) { true }
 
-      expect(tracer.finished_spans.last.tags).to eq(tags)
+      expect(tracer).to have_span.with_tag(tags)
     end
 
     it "allows to specify custom per-method-call tracer" do
       local_tracer = Test::Tracer.new
       Method::Tracer.trace("test span", tracer: local_tracer) { true }
-      expect(tracer.finished_spans).to be_empty
-      expect(local_tracer.finished_spans.last.operation_name).to eq("test span")
+
+      expect(tracer).not_to have_spans
+      expect(local_tracer).to have_span("test span")
     end
 
     context "exception is thrown within yielded block" do
@@ -39,15 +40,13 @@ RSpec.describe Method::Tracer do
 
       it "sets error tag to true" do
         expect { Method::Tracer.trace("test span") { raise error } }.to raise_error do |_|
-          expect(tracer.finished_spans.last.tags['error']).to eq(true)
+          expect(tracer).to have_span.with_tag('error', true)
         end
       end
 
       it "logs error event" do
         expect { Method::Tracer.trace("test span") { raise error } }.to raise_error do |_|
-          log = tracer.finished_spans.last.logs.first
-          expect(log.event).to eq('error')
-          expect(log.fields[:'error.object']).to eq(error)
+          expect(tracer).to have_span.with_log(event: 'error', :'error.object' => error)
         end
       end
     end
@@ -59,21 +58,21 @@ RSpec.describe Method::Tracer do
       it "is used as a parent span for newely created span" do
         Method::Tracer.trace("test span") { true }
 
-        expect(tracer.finished_spans.last.context.parent_span_id).to eq(span.context.span_id)
+        expect(tracer).to have_span("test span").with_parent("root")
       end
 
       it "allows to override active span" do
         new_root = tracer.start_span("new root")
         Method::Tracer.trace("test span", child_of: new_root) { true }
 
-        expect(tracer.finished_spans.last.context.parent_span_id).to eq(new_root.context.span_id)
+        expect(tracer).to have_span("test span").with_parent("new root")
       end
 
       it "allows to override active span with proc" do
         new_root = tracer.start_span("new root")
         Method::Tracer.trace("test span", child_of: -> { new_root }) { true }
 
-        expect(tracer.finished_spans.last.context.parent_span_id).to eq(new_root.context.span_id)
+        expect(tracer).to have_span("test span").with_parent("new root")
       end
     end
   end
@@ -111,23 +110,23 @@ RSpec.describe Method::Tracer do
       it "works with class methods" do
         TracedClass.class_outer_method
 
-        expect(tracer.spans.size).to eq(2)
-        expect(tracer.spans.first.operation_name).to eq("#<Class:TracedClass>#class_outer_method")
+        expect(tracer).to have_spans(2)
+        expect(tracer).to have_span("#<Class:TracedClass>#class_outer_method")
       end
 
       describe "single method" do
         before { TracedClass.new.inner_method }
 
         it "creates a new span" do
-          expect(tracer.spans.size).to eq(1)
+          expect(tracer).to have_spans(1)
         end
 
         it "finishes a new span" do
-          expect(tracer.finished_spans.size).to eq(1)
+          expect(tracer).to have_spans(1).finished
         end
 
         it "sets operation_name to Class#method" do
-          expect(tracer.finished_spans.first.operation_name).to eq("TracedClass#inner_method")
+          expect(tracer).to have_span("TracedClass#inner_method")
         end
       end
 
@@ -135,21 +134,17 @@ RSpec.describe Method::Tracer do
         before { TracedClass.new.outer_method }
 
         it "creates a span for each method" do
-          expect(tracer.spans.size).to eq(2)
+          expect(tracer).to have_spans(2)
         end
 
         it "finishes spans for all methods" do
-          expect(tracer.finished_spans.size).to eq(2)
+          expect(tracer).to have_spans(2).finished
         end
 
         it "starts methods starting from outer" do
-          expect(tracer.spans.first.operation_name).to eq("TracedClass#outer_method")
-          expect(tracer.spans.last.operation_name).to eq("TracedClass#inner_method")
-        end
-
-        it "finishes methods starting from inner" do
-          expect(tracer.finished_spans.first.operation_name).to eq("TracedClass#inner_method")
-          expect(tracer.finished_spans.last.operation_name).to eq("TracedClass#outer_method")
+          expect(tracer).to have_span("TracedClass#inner_method")
+            .following_after("TracedClass#outer_method")
+            .finished
         end
       end
     end

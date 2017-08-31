@@ -1,5 +1,6 @@
 require "bundler/setup"
 require "test/tracer"
+require "tracing/matchers"
 require "method/tracer"
 
 RSpec.configure do |config|
