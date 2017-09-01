@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/iaintshine/ruby-method-tracer.svg?branch=master)](https://travis-ci.org/iaintshine/ruby-method-tracer)
+
 # Method::Tracer
 
 The gem provides OpenTracing instrumentation for custom Ruby methods.
