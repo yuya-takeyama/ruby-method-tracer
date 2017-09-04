@@ -46,7 +46,7 @@ class TracedClass
   end
 
   def instance_method
-    Method::Tracer.trace("inner span") do
+    Method::Tracer.trace("inner span") do |span|
       # business code
     end
   end
